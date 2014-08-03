@@ -40,12 +40,20 @@ from processing.core.GeoAlgorithm import GeoAlgorithm
 from processing.core.GeoAlgorithmExecutionException import \
     GeoAlgorithmExecutionException
 
-from processing.parameters.ParameterRaster import ParameterRaster
-from processing.parameters.ParameterBoolean import ParameterBoolean
-from processing.parameters.ParameterSelection import ParameterSelection
-from processing.parameters.ParameterString import ParameterString
-from processing.parameters.ParameterFile import ParameterFile
-from processing.outputs.OutputDirectory import OutputDirectory
+try:
+    from processing.parameters.ParameterRaster import ParameterRaster
+    from processing.parameters.ParameterBoolean import ParameterBoolean
+    from processing.parameters.ParameterSelection import ParameterSelection
+    from processing.parameters.ParameterString import ParameterString
+    from processing.parameters.ParameterFile import ParameterFile
+    from processing.outputs.OutputDirectory import OutputDirectory
+except:
+    from processing.core.parameters import ParameterRaster
+    from processing.core.parameters import ParameterBoolean
+    from processing.core.parameters import ParameterSelection
+    from processing.core.parameters import ParameterString
+    from processing.core.parameters import ParameterFile
+    from processing.core.outputs import OutputDirectory
 
 from processing.tools import system
 

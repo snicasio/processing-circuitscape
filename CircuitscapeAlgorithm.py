@@ -34,7 +34,10 @@ from qgis.core import *
 
 from processing.core.GeoAlgorithm import GeoAlgorithm
 
-from processing.parameters.ParameterRaster import ParameterRaster
+try:
+    from processing.parameters.ParameterRaster import ParameterRaster
+except:
+    from processing.core.parameters import ParameterRaster
 
 from processing.tools import system
 
