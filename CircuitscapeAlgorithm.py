@@ -27,6 +27,8 @@ __revision__ = '$Format:%H$'
 
 import os
 
+from qgis.PyQt.QtGui import QIcon
+
 from processing.core.GeoAlgorithm import GeoAlgorithm
 from processing.core.parameters import ParameterRaster
 
@@ -45,6 +47,9 @@ class CircuitscapeAlgorithm(GeoAlgorithm):
         GeoAlgorithm.__init__(self)
 
         self.exportedLayers = {}
+
+    def getIcon(self):
+        return QIcon(os.path.join(pluginPath, 'icons', 'circuitscape.png'))
 
     def exportRasterLayer(self, source):
         global sessionExportedLayers
