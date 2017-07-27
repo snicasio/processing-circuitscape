@@ -27,21 +27,14 @@ __revision__ = '$Format:%H$'
 
 import os
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-
-from qgis.core import *
-
 from processing.core.GeoAlgorithm import GeoAlgorithm
-
-try:
-    from processing.parameters.ParameterRaster import ParameterRaster
-except:
-    from processing.core.parameters import ParameterRaster
+from processing.core.parameters import ParameterRaster
 
 from processing.tools import system
 
 from CircuitscapeUtils import CircuitscapeUtils
+
+pluginPath = os.path.dirname(__file__)
 
 sessionExportedLayers = {}
 
@@ -71,7 +64,7 @@ class CircuitscapeAlgorithm(GeoAlgorithm):
         self.exportedLayers[source] = destFilename
         sessionExportedLayers[source] = destFilename
 
-        return 'gdal_translate -of AAIGrid %s %s' % (source, destFilename)
+        return 'gdal_translate -of AAIGrid {} {}'.format(source, destFilename)
 
     def prepareInputs(self):
         commands = []

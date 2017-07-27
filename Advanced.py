@@ -28,11 +28,6 @@ __revision__ = '$Format:%H$'
 import os
 import ConfigParser
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-
-from qgis.core import *
-
 from processing.core.Processing import Processing
 from processing.core.ProcessingLog import ProcessingLog
 from processing.core.ProcessingConfig import ProcessingConfig
@@ -40,27 +35,17 @@ from processing.core.GeoAlgorithm import GeoAlgorithm
 from processing.core.GeoAlgorithmExecutionException import \
     GeoAlgorithmExecutionException
 
-try:
-    from processing.parameters.ParameterRaster import ParameterRaster
-    from processing.parameters.ParameterBoolean import ParameterBoolean
-    from processing.parameters.ParameterSelection import ParameterSelection
-    from processing.parameters.ParameterString import ParameterString
-    from processing.parameters.ParameterFile import ParameterFile
-    from processing.outputs.OutputDirectory import OutputDirectory
-except:
-    from processing.core.parameters import ParameterRaster
-    from processing.core.parameters import ParameterBoolean
-    from processing.core.parameters import ParameterSelection
-    from processing.core.parameters import ParameterString
-    from processing.core.parameters import ParameterFile
-    from processing.core.outputs import OutputDirectory
+from processing.core.parameters import (ParameterRaster,
+                                        ParameterBoolean,
+                                        ParameterSelection,
+                                        ParameterString,
+                                        ParameterFile)
+from processing.core.outputs import OutputDirectory
 
 from processing.tools import system
 
 from processing_circuitscape.CircuitscapeAlgorithm import CircuitscapeAlgorithm
 from CircuitscapeUtils import CircuitscapeUtils
-
-sessionExportedLayers = {}
 
 
 class Advanced(CircuitscapeAlgorithm):
@@ -157,9 +142,6 @@ class Advanced(CircuitscapeAlgorithm):
 
         baseName = self.getParameterValue(self.BASENAME)
         directory = self.getOutputValue(self.DIRECTORY)
-        progress.setInfo('basename: %s' % baseName)
-        progress.setInfo('directory: %s' % directory)
-
         basePath = os.path.join(directory, baseName)
 
         iniPath = CircuitscapeUtils.writeConfiguration()
@@ -184,10 +166,12 @@ class Advanced(CircuitscapeAlgorithm):
             groundPoints = self.exportedLayers[groundPoints]
         cfg.set('Options for advanced mode', 'ground_file', groundPoints)
         cfg.set('Options for advanced mode',
-            'ground_file_is_resistances', gpConductance)
+                'ground_file_is_resistances',
+                gpConductance)
         cfg.set('Options for advanced mode', 'remove_src_or_gnd', unitCurrents)
         cfg.set('Options for advanced mode',
-            'use_direct_grounds', directConnections)
+                'use_direct_grounds',
+                directConnections)
 
         if mask is not None:
             if mask in self.exportedLayers.keys():
@@ -199,9 +183,11 @@ class Advanced(CircuitscapeAlgorithm):
             if shortCircuit in self.exportedLayers.keys():
                 shortCircuit = self.exportedLayers[shortCircuit]
             cfg.set('Short circuit regions (aka polygons)',
-                'polygon_file', shortCircuit)
+                    'polygon_file',
+                    shortCircuit)
             cfg.set('Short circuit regions (aka polygons)',
-                'use_polygons', 'True')
+                    'use_polygons',
+                    'True')
 
         cfg.set('Output options', 'write_cur_maps', writeCurrent)
         cfg.set('Output options', 'write_volt_maps', writeVoltage)
@@ -212,10 +198,9 @@ class Advanced(CircuitscapeAlgorithm):
             cfg.write(f)
 
         if system.isWindows():
-            commands.append(
-                '"' + os.path.join(path, 'cs_run.exe') + '" ' + iniPath)
+            commands.append('"{}" {}'.format(os.path.join(path, 'cs_run.exe'), iniPath))
         else:
-            commands.append('csrun.py ' + iniPath)
+            commands.append('csrun.py {}'.format(iniPath))
 
         CircuitscapeUtils.createBatchJobFileFromCommands(commands)
         loglines = []

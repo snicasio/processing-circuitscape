@@ -30,11 +30,9 @@ import stat
 import subprocess
 import ConfigParser
 
-from qgis.core import QgsApplication
-
 from processing.core.ProcessingLog import ProcessingLog
 from processing.core.ProcessingConfig import ProcessingConfig
-from processing.tools.system import *
+from processing.tools import system
 
 
 class CircuitscapeUtils:
@@ -163,7 +161,7 @@ class CircuitscapeUtils:
         cfg.set('Circuitscape mode', 'data_type', 'raster')
         cfg.set('Circuitscape mode', 'scenario', '')
 
-        iniPath = getTempFilename('.ini')
+        iniPath = system.getTempFilename('.ini')
         with open(iniPath, 'wb') as f:
             cfg.write(f)
 

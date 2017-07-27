@@ -28,11 +28,6 @@ __revision__ = '$Format:%H$'
 import os
 import ConfigParser
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-
-from qgis.core import *
-
 from processing.core.Processing import Processing
 from processing.core.ProcessingLog import ProcessingLog
 from processing.core.ProcessingConfig import ProcessingConfig
@@ -40,20 +35,12 @@ from processing.core.GeoAlgorithm import GeoAlgorithm
 from processing.core.GeoAlgorithmExecutionException import \
     GeoAlgorithmExecutionException
 
-try:
-    from processing.parameters.ParameterRaster import ParameterRaster
-    from processing.parameters.ParameterBoolean import ParameterBoolean
-    from processing.parameters.ParameterSelection import ParameterSelection
-    from processing.parameters.ParameterString import ParameterString
-    from processing.parameters.ParameterFile import ParameterFile
-    from processing.outputs.OutputDirectory import OutputDirectory
-except:
-    from processing.core.parameters import ParameterRaster
-    from processing.core.parameters import ParameterBoolean
-    from processing.core.parameters import ParameterSelection
-    from processing.core.parameters import ParameterString
-    from processing.core.parameters import ParameterFile
-    from processing.core.outputs import OutputDirectory
+from processing.core.parameters import (ParameterRaster,
+                                        ParameterBoolean,
+                                        ParameterSelection,
+                                        ParameterString,
+                                        ParameterFile)
+from processing.core.outputs import OutputDirectory
 
 from processing.tools import system
 
@@ -107,7 +94,6 @@ class OneToAll(CircuitscapeAlgorithm):
             'Raster short-circuit region file', optional=True))
         self.addParameter(ParameterRaster(self.SOURCE_STRENGTH,
             'Source strength file', optional=True))
-
         self.addParameter(ParameterString(self.BASENAME,
             'Output basename', 'csoutput'))
 
@@ -135,9 +121,6 @@ class OneToAll(CircuitscapeAlgorithm):
 
         baseName = self.getParameterValue(self.BASENAME)
         directory = self.getOutputValue(self.DIRECTORY)
-        progress.setInfo('basename: %s' % baseName)
-        progress.setInfo('directory: %s' % directory)
-
         basePath = os.path.join(directory, baseName)
 
         iniPath = CircuitscapeUtils.writeConfiguration()
@@ -150,7 +133,8 @@ class OneToAll(CircuitscapeAlgorithm):
         cfg.set('Circuitscape mode', 'scenario', mode)
 
         cfg.set('Habitat raster or graph',
-            'habitat_map_is_resistances', useConductance)
+                'habitat_map_is_resistances',
+                useConductance)
         if resistance in self.exportedLayers.keys():
             resistance = self.exportedLayers[resistance]
         cfg.set('Habitat raster or graph', 'habitat_file', resistance)
@@ -158,13 +142,16 @@ class OneToAll(CircuitscapeAlgorithm):
         if focal in self.exportedLayers.keys():
             focal = self.exportedLayers[focal]
         cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-            'point_file', focal)
+                'point_file',
+                focal)
 
         if sourceStrength is not None:
             cfg.set('Options for one-to-all and all-to-one modes',
-                'variable_source_file', sourceStrength)
+                    'variable_source_file',
+                    sourceStrength)
             cfg.set('Options for one-to-all and all-to-one modes',
-                'use_variable_source_strengths', 'True')
+                    'use_variable_source_strengths',
+                    'True')
 
         if mask is not None:
             if mask in self.exportedLayers.keys():
@@ -176,9 +163,11 @@ class OneToAll(CircuitscapeAlgorithm):
             if shortCircuit in self.exportedLayers.keys():
                 shortCircuit = self.exportedLayers[shortCircuit]
             cfg.set('Short circuit regions (aka polygons)',
-                'polygon_file', shortCircuit)
+                    'polygon_file',
+                    shortCircuit)
             cfg.set('Short circuit regions (aka polygons)',
-                'use_polygons', 'True')
+                    'use_polygons',
+                    'True')
 
         cfg.set('Output options', 'write_cur_maps', writeCurrent)
         cfg.set('Output options', 'write_volt_maps', writeVoltage)
@@ -189,10 +178,9 @@ class OneToAll(CircuitscapeAlgorithm):
             cfg.write(f)
 
         if system.isWindows():
-            commands.append(
-                '"' + os.path.join(path, 'cs_run.exe') + '" ' + iniPath)
+            commands.append('"{}" {}'.format(os.path.join(path, 'cs_run.exe'), iniPath))
         else:
-            commands.append('csrun.py ' + iniPath)
+            commands.append('csrun.py {}'.format(iniPath))
 
         CircuitscapeUtils.createBatchJobFileFromCommands(commands)
         loglines = []

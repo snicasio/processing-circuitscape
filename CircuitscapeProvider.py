@@ -27,7 +27,7 @@ __revision__ = '$Format:%H$'
 
 import os
 
-from PyQt4.QtGui import *
+from qgis.PyQt.QtGui import QIcon
 
 from processing.core.AlgorithmProvider import AlgorithmProvider
 from processing.core.ProcessingConfig import Setting, ProcessingConfig
@@ -37,6 +37,8 @@ from processing_circuitscape.Pairwise import Pairwise
 from processing_circuitscape.OneToAll import OneToAll
 from processing_circuitscape.Advanced import Advanced
 from processing_circuitscape.CircuitscapeUtils import CircuitscapeUtils
+
+pluginPath = os.path.dirname(__file__)
 
 
 class CircuitscapeProvider(AlgorithmProvider):
@@ -128,7 +130,7 @@ class CircuitscapeProvider(AlgorithmProvider):
         return 'Circuitscape'
 
     def getIcon(self):
-        return QIcon(os.path.dirname(__file__) + '/icons/circuitscape.png')
+        return QIcon(os.path.join(pluginPath, 'icons', 'circuitscape.png'))
 
     def _loadAlgorithms(self):
         self.algs = self.alglist
