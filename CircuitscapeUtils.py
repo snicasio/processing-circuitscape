@@ -32,7 +32,7 @@ import ConfigParser
 
 from processing.core.ProcessingLog import ProcessingLog
 from processing.core.ProcessingConfig import ProcessingConfig
-from processing.tools import system
+from processing.tools.system import getTempFilename, isWindows
 
 
 class CircuitscapeUtils:
@@ -161,7 +161,7 @@ class CircuitscapeUtils:
         cfg.set('Circuitscape mode', 'data_type', 'raster')
         cfg.set('Circuitscape mode', 'scenario', '')
 
-        iniPath = system.getTempFilename('.ini')
+        iniPath = getTempFilename('.ini')
         with open(iniPath, 'wb') as f:
             cfg.write(f)
 
