@@ -5,7 +5,7 @@
     Advanced.py
     ---------------------
     Date                 : May 2014
-    Copyright            : (C) 2014-2017 by Alexander Bruy
+    Copyright            : (C) 2014-2018 by Alexander Bruy
     Email                : alexander dot bruy at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -19,197 +19,184 @@
 
 __author__ = 'Alexander Bruy'
 __date__ = 'May 2014'
-__copyright__ = '(C) 2014-2017, Alexander Bruy'
+__copyright__ = '(C) 2014-2018, Alexander Bruy'
 
 # This will get replaced with a git SHA1 when you do a git archive
 
 __revision__ = '$Format:%H$'
 
 import os
-import ConfigParser
+import configparser
 
-from processing.core.Processing import Processing
-from processing.core.ProcessingLog import ProcessingLog
+from qgis.core import (QgsProcessing,
+                       QgsProcessingParameterRasterLayer,
+                       QgsProcessingParameterBoolean,
+                       QgsProcessingParameterString,
+                       QgsProcessingParameterEnum,
+                       QgsProcessingParameterFolderDestination
+                      )
 from processing.core.ProcessingConfig import ProcessingConfig
-from processing.core.GeoAlgorithm import GeoAlgorithm
-from processing.core.GeoAlgorithmExecutionException import \
-    GeoAlgorithmExecutionException
-
-from processing.core.parameters import (ParameterRaster,
-                                        ParameterBoolean,
-                                        ParameterSelection,
-                                        ParameterString,
-                                        ParameterFile)
-from processing.core.outputs import OutputDirectory
-
 from processing.tools import system
 
 from processing_circuitscape.CircuitscapeAlgorithm import CircuitscapeAlgorithm
-from CircuitscapeUtils import CircuitscapeUtils
+from processing_circuitscape import CircuitscapeUtils
 
 
 class Advanced(CircuitscapeAlgorithm):
 
-    RESISTANCE_MAP = 'RESISTANCE_MAP'
-    IS_CONDUCTANCES = 'IS_CONDUCTANCES'
-    CURRENT_SOURCE = 'CURRENT_SOURCE'
-    GROUND_POINT = 'GROUND_POINT'
-    GP_CONDUCTANCES = 'GP_CONDUCTANCES'
-    MODE = 'MODE'
-    UNIT_CURRENTS = 'UNIT_CURRENTS'
-    DIRECT_CONNECTIONS = 'DIRECT_CONNECTIONS'
-    WRITE_CURRENT_MAP = 'WRITE_CURRENT_MAP'
-    WRITE_VOLTAGE_MAP = 'WRITE_VOLTAGE_MAP'
-    MASK = 'MASK'
-    SHORT_CIRCUIT = 'SHORT_CIRCUIT'
-    BASENAME = 'BASENAME'
-    DIRECTORY = 'DIRECTORY'
+    RESISTANCE_MAP = "RESISTANCE_MAP"
+    IS_CONDUCTANCES = "IS_CONDUCTANCES"
+    CURRENT_SOURCE = "CURRENT_SOURCE"
+    GROUND_POINT = "GROUND_POINT"
+    GP_CONDUCTANCES = "GP_CONDUCTANCES"
+    MODE = "MODE"
+    UNIT_CURRENTS = "UNIT_CURRENTS"
+    DIRECT_CONNECTIONS = "DIRECT_CONNECTIONS"
+    WRITE_CURRENT_MAP = "WRITE_CURRENT_MAP"
+    WRITE_VOLTAGE_MAP = "WRITE_VOLTAGE_MAP"
+    MASK = "MASK"
+    SHORT_CIRCUIT = "SHORT_CIRCUIT"
+    BASENAME = "BASENAME"
+    DIRECTORY = "DIRECTORY"
 
-    MODES = ['Keep both when possible but remove ground if source is tied '
-             'directly to ground',
-             'Remove source',
-             'Remove ground',
-             'Remove both source and ground'
-            ]
-    MODES_DICT = {0: 'keepall',
-                  1: 'rmvsrc',
-                  2: 'rmvgnd',
-                  3: 'rmvall'
-                 }
+    def name(self):
+        return "advanced"
+
+    def displayName(self):
+        return self.tr("Advanced")
+
+    def group(self):
+        return self.tr("Circuitscape")
+
+    def groupId(self):
+        return "circuitscape"
 
     def __init__(self):
-        CircuitscapeAlgorithm.__init__(self)
+        super().__init__()
 
-    def defineCharacteristics(self):
-        self.name = 'Advanced modelling'
-        self.group = 'Circuitscape'
+    def initAlgorithm(self, config=None):
+        self.modes = ((self.tr("Keep both when possible"), "keepall"),
+                      (self.tr("Remove source"), "rmvsrc"),
+                      (self.tr("Remove ground"), "rmvgnd"),
+                      (self.tr("Remove both"), "rmvall"))
 
-        self.addParameter(ParameterRaster(self.RESISTANCE_MAP,
-            'Raster resistance map'))
-        self.addParameter(ParameterBoolean(self.IS_CONDUCTANCES,
-            'Data represent conductances instead of resistances', False))
-        self.addParameter(ParameterRaster(self.CURRENT_SOURCE,
-            'Current source file'))
-        self.addParameter(ParameterRaster(self.GROUND_POINT,
-            'Ground point file'))
-        self.addParameter(ParameterBoolean(self.GP_CONDUCTANCES,
-            'Data represent conductances instead of resistances to ground',
-            False))
-        self.addParameter(ParameterSelection(self.MODE,
-            'When a source and ground are at the same node', self.MODES, 0))
-        self.addParameter(ParameterBoolean(self.UNIT_CURRENTS,
-            'Use unit currents (i = 1) for all current sources', False))
-        self.addParameter(ParameterBoolean(self.DIRECT_CONNECTIONS,
-            'Use direct connections to ground (R = 0) for all ground points',
-            False))
-        self.addParameter(ParameterBoolean(self.WRITE_CURRENT_MAP,
-            'Create current map', True))
-        self.addParameter(ParameterBoolean(self.WRITE_VOLTAGE_MAP,
-            'Create voltage map', True))
-        self.addParameter(ParameterRaster(self.MASK,
-            'Raster mask file', optional=True))
-        self.addParameter(ParameterRaster(self.SHORT_CIRCUIT,
-            'Raster short-circuit region file', optional=True))
-        self.addParameter(ParameterString(self.BASENAME,
-            'Output basename', 'csoutput'))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.RESISTANCE_MAP,
+                                                            self.tr("Raster resistance map")))
+        self.addParameter(QgsProcessingParameterBoolean(self.IS_CONDUCTANCES,
+                                                        self.tr("Data represent conductances instead of resistances"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.CURRENT_SOURCE,
+                                                            self.tr("Current source")))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.GROUND_POINT,
+                                                            self.tr("Ground point")))
+        self.addParameter(QgsProcessingParameterBoolean(self.GP_CONDUCTANCES,
+                                                        self.tr("Data represent conductances instead of resistances to ground"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterEnum(self.MODE,
+                                                     self.tr("When a source and ground are at the same node"),
+                                                     options=[i[0] for i in self.modes],
+                                                     allowMultiple=False,
+                                                     defaultValue=0))
+        self.addParameter(QgsProcessingParameterBoolean(self.UNIT_CURRENTS,
+                                                        self.tr("Use unit currents (i = 1) for all current sources"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterBoolean(self.DIRECT_CONNECTIONS,
+                                                        self.tr("Use direct connections to ground (R = 0) for all ground points"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterBoolean(self.WRITE_CURRENT_MAP,
+                                                        self.tr("Create current map"),
+                                                        True))
+        self.addParameter(QgsProcessingParameterBoolean(self.WRITE_VOLTAGE_MAP,
+                                                        self.tr("Create voltage map"),
+                                                        True))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.MASK,
+                                                            self.tr("Mask raster"),
+                                                            optional=True))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.SHORT_CIRCUIT,
+                                                            self.tr("Short-circuit region"),
+                                                            optional=True))
+        self.addParameter(QgsProcessingParameterString(self.BASENAME,
+                                                       self.tr("Output basename"),
+                                                       "csoutput"))
 
-        self.addOutput(OutputDirectory(self.DIRECTORY, 'Output directory'))
+        self.addParameter(QgsProcessingParameterFolderDestination(self.DIRECTORY,
+                                                                  self.tr("Output directory")))
 
-    def processAlgorithm(self, progress):
-        if system.isWindows():
-            path = CircuitscapeUtils.circuitscapePath()
-            if path == '':
-                raise GeoAlgorithmExecutionException(
-                    'Circuitscape folder is not configured.\nPlease '
-                    'configure it before running Circuitscape algorithms.')
-
-        resistance = self.getParameterValue(self.RESISTANCE_MAP)
-        useConductance = str(not self.getParameterValue(self.IS_CONDUCTANCES))
-        currentSources = self.getParameterValue(self.CURRENT_SOURCE)
-        groundPoints = self.getParameterValue(self.GROUND_POINT)
-        gpConductance = str(not self.getParameterValue(self.GP_CONDUCTANCES))
-
-        writeCurrent = str(self.getParameterValue(self.WRITE_CURRENT_MAP))
-        writeVoltage = str(self.getParameterValue(self.WRITE_VOLTAGE_MAP))
+    def processAlgorithm(self, parameters, context, feedback):
+        resistance = self.parameterAsRasterLayer(parameters, self.RESISTANCE_MAP, context).source()
+        useConductance = str(not self.parameterAsBool(parameters, self.IS_CONDUCTANCES, context))
+        currentSources = self.parameterAsRasterLayer(parameters, self.CURRENT_SOURCE, context).source()
+        groundPoints = self.parameterAsRasterLayer(parameters, self.GROUND_POINT, context)
+        gpConductance = str(not self.parameterAsBool(parameters, self.GP_CONDUCTANCES, context))
+        writeCurrent = str(self.parameterAsBool(parameters, self.WRITE_CURRENT_MAP, context))
+        writeVoltage = str(self.parameterAsBool(parameters, self.WRITE_VOLTAGE_MAP, context))
 
         # advanced parameters
-        mode = self.MODES_DICT[self.getParameterValue(self.MODE)]
-        unitCurrents = str(self.getParameterValue(self.UNIT_CURRENTS))
-        directConnections = str(
-            self.getParameterValue(self.DIRECT_CONNECTIONS))
-        mask = self.getParameterValue(self.MASK)
-        shortCircuit = self.getParameterValue(self.SHORT_CIRCUIT)
+        mode = self.modes[self.parameterAsEnum(parameters, self.MODE, context)][1]
+        unitCurrents = str(self.parameterAsBool(parameters, self.UNIT_CURRENTS, context))
+        directConnections = str(self.parameterAsBool(parameters, self.DIRECT_CONNECTIONS, context))
+        mask = self.parameterAsRasterLayer(parameters, self.MASK, context)
+        shortCircuit = self.parameterAsRasterLayer(parameters, self.SHORT_CIRCUIT, context)
 
-        baseName = self.getParameterValue(self.BASENAME)
-        directory = self.getOutputValue(self.DIRECTORY)
+        baseName = self.parameterAsString(parameters, self.BASENAME, context)
+        directory = self.parameterAsString(parameters, self.DIRECTORY, context)
         basePath = os.path.join(directory, baseName)
 
+        commands = self.prepareInputs(parameters, context)
+
         iniPath = CircuitscapeUtils.writeConfiguration()
-        cfg = ConfigParser.SafeConfigParser()
+        cfg = configparser.ConfigParser()
         cfg.read(iniPath)
 
-        commands = self.prepareInputs()
-
         # set parameters
-        cfg.set('Circuitscape mode', 'scenario', 'advanced')
+        cfg["Circuitscape mode"]["scenario"] = "advanced"
 
-        cfg.set('Habitat raster or graph',
-            'habitat_map_is_resistances', useConductance)
+        section = cfg["Habitat raster or graph"]
+        section["habitat_map_is_resistances"] = useConductance
         if resistance in self.exportedLayers.keys():
-            resistance = self.exportedLayers[resistance]
-        cfg.set('Habitat raster or graph', 'habitat_file', resistance)
+            section["habitat_file"] = self.exportedLayers[resistance]
 
+        section = cfg["Options for advanced mode"]
         if currentSources in self.exportedLayers.keys():
-            currentSources = self.exportedLayers[currentSources]
-        cfg.set('Options for advanced mode', 'source_file', currentSources)
+            section["source_file"] = self.exportedLayers[currentSources]
+
         if groundPoints in self.exportedLayers.keys():
-            groundPoints = self.exportedLayers[groundPoints]
-        cfg.set('Options for advanced mode', 'ground_file', groundPoints)
-        cfg.set('Options for advanced mode',
-                'ground_file_is_resistances',
-                gpConductance)
-        cfg.set('Options for advanced mode', 'remove_src_or_gnd', unitCurrents)
-        cfg.set('Options for advanced mode',
-                'use_direct_grounds',
-                directConnections)
+            section["ground_file"] = self.exportedLayers[groundPoints]
+
+        section["ground_file_is_resistances"] = gpConductance
+        section["remove_src_or_gnd"] = unitCurrents
+        section["use_direct_grounds"] = directConnections
 
         if mask is not None:
             if mask in self.exportedLayers.keys():
-                mask = self.exportedLayers[mask]
-            cfg.set('Mask file', 'mask_file', mask)
-            cfg.set('Mask file', 'use_mask', 'True')
+                section = cfg["Mask file"]
+                section["mask_file"] = self.exportedLayers[mask]
+                section["use_mask"] = "True"
 
         if shortCircuit is not None:
             if shortCircuit in self.exportedLayers.keys():
-                shortCircuit = self.exportedLayers[shortCircuit]
-            cfg.set('Short circuit regions (aka polygons)',
-                    'polygon_file',
-                    shortCircuit)
-            cfg.set('Short circuit regions (aka polygons)',
-                    'use_polygons',
-                    'True')
+                section = cfg["Short circuit regions (aka polygons)"]
+                section["polygon_file"] = self.exportedLayers[shortCircuit]
+                section["use_polygons"] = "True"
 
-        cfg.set('Output options', 'write_cur_maps', writeCurrent)
-        cfg.set('Output options', 'write_volt_maps', writeVoltage)
-        cfg.set('Output options', 'output_file', basePath)
+        cfg["Output options"]["write_cur_maps"] = writeCurrent
+        cfg["Output options"]["write_volt_maps"] = writeVoltage
+        cfg["Output options"]["output_file"] = basePath
 
-        # write configuration back to file
-        with open(iniPath, 'wb') as f:
+        # write configuration back to the file
+        with open(iniPath, "w") as f:
             cfg.write(f)
 
         if system.isWindows():
-            commands.append('"{}" {}'.format(os.path.join(path, 'cs_run.exe'), iniPath))
+            csPath = CircuitscapeUtils.circuitscapeDirectory()
+            if csPath == "":
+                csPath = "cs_run.exe"
+            else:
+                csPath = os.path.join(csPath, "cs_run.exe")
+
+            commands.append('"{}" {}'.format(csPath, iniPath))
         else:
-            commands.append('csrun.py {}'.format(iniPath))
+            commands.append("csrun.py {}".format(iniPath))
 
-        CircuitscapeUtils.createBatchJobFileFromCommands(commands)
-        loglines = []
-        loglines.append('Circuitscape execution commands')
-        for line in commands:
-            progress.setCommand(line)
-            loglines.append(line)
-
-        if ProcessingConfig.getSetting(CircuitscapeUtils.LOG_COMMANDS):
-            ProcessingLog.addToLog(ProcessingLog.LOG_INFO, loglines)
-
-        CircuitscapeUtils.executeCircuitscape(commands, progress)
+        CircuitscapeUtils.jobFileFromCommands(commands)
+        CircuitscapeUtils.execute(feedback)

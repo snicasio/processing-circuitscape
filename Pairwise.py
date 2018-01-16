@@ -5,7 +5,7 @@
     Pairwise.py
     ---------------------
     Date                 : May 2014
-    Copyright            : (C) 2014-2017 by Alexander Bruy
+    Copyright            : (C) 2014-2018 by Alexander Bruy
     Email                : alexander dot bruy at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -19,169 +19,160 @@
 
 __author__ = 'Alexander Bruy'
 __date__ = 'May 2014'
-__copyright__ = '(C) 2014-2017, Alexander Bruy'
+__copyright__ = '(C) 2014-2018, Alexander Bruy'
 
 # This will get replaced with a git SHA1 when you do a git archive
 
 __revision__ = '$Format:%H$'
 
 import os
-import ConfigParser
+import configparser
 
-from processing.core.Processing import Processing
-from processing.core.ProcessingLog import ProcessingLog
+from qgis.core import (QgsProcessing,
+                       QgsProcessingParameterRasterLayer,
+                       QgsProcessingParameterBoolean,
+                       QgsProcessingParameterString,
+                       QgsProcessingParameterFolderDestination
+                      )
 from processing.core.ProcessingConfig import ProcessingConfig
-from processing.core.GeoAlgorithm import GeoAlgorithm
-from processing.core.GeoAlgorithmExecutionException import \
-    GeoAlgorithmExecutionException
-
-from processing.core.parameters import (ParameterRaster,
-                                        ParameterBoolean,
-                                        ParameterString,
-                                        ParameterFile)
-from processing.core.outputs import OutputDirectory
-
 from processing.tools import system
 
 from processing_circuitscape.CircuitscapeAlgorithm import CircuitscapeAlgorithm
-from CircuitscapeUtils import CircuitscapeUtils
+from processing_circuitscape import CircuitscapeUtils
 
 
 class Pairwise(CircuitscapeAlgorithm):
 
-    RESISTANCE_MAP = 'RESISTANCE_MAP'
-    IS_CONDUCTANCES = 'IS_CONDUCTANCES'
-    FOCAL_NODE = 'FOCAL_NODE'
-    WRITE_CURRENT_MAP = 'WRITE_CURRENT_MAP'
-    WRITE_VOLTAGE_MAP = 'WRITE_VOLTAGE_MAP'
-    MASK = 'MASK'
-    SHORT_CIRCUIT = 'SHORT_CIRCUIT'
-    EXCLUDE_INCLUDE = 'EXCLUDE_INCLUDE'
-    LOW_MEMORY = 'LOW_MEMORY'
-    BASENAME = 'BASENAME'
-    DIRECTORY = 'DIRECTORY'
+    RESISTANCE_MAP = "RESISTANCE_MAP"
+    IS_CONDUCTANCES = "IS_CONDUCTANCES"
+    FOCAL_NODE = "FOCAL_NODE"
+    WRITE_CURRENT_MAP = "WRITE_CURRENT_MAP"
+    WRITE_VOLTAGE_MAP = "WRITE_VOLTAGE_MAP"
+    MASK = "MASK"
+    SHORT_CIRCUIT = "SHORT_CIRCUIT"
+    EXCLUDE_INCLUDE = "EXCLUDE_INCLUDE"
+    LOW_MEMORY = "LOW_MEMORY"
+    BASENAME = "BASENAME"
+    DIRECTORY = "DIRECTORY"
+
+    def name(self):
+        return "pairwise"
+
+    def displayName(self):
+        return self.tr("Pairwise")
+
+    def group(self):
+        return self.tr("Circuitscape")
+
+    def groupId(self):
+        return "circuitscape"
 
     def __init__(self):
-        CircuitscapeAlgorithm.__init__(self)
+        super().__init__()
 
-    def defineCharacteristics(self):
-        self.name = 'Pairwise modelling'
-        self.group = 'Circuitscape'
+    def initAlgorithm(self, config=None):
+        self.addParameter(QgsProcessingParameterRasterLayer(self.RESISTANCE_MAP,
+                                                            self.tr("Resistance map")))
+        self.addParameter(QgsProcessingParameterBoolean(self.IS_CONDUCTANCES,
+                                                        self.tr("Data represent conductances instead of resistances"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.FOCAL_NODE,
+                                                            self.tr("Focal node location")))
+        self.addParameter(QgsProcessingParameterBoolean(self.WRITE_CURRENT_MAP,
+                                                        self.tr("Create current map"),
+                                                        True))
+        self.addParameter(QgsProcessingParameterBoolean(self.WRITE_VOLTAGE_MAP,
+                                                        self.tr("Create voltage map"),
+                                                        True))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.MASK,
+                                                            self.tr("Mask raster"),
+                                                            optional=True))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.SHORT_CIRCUIT,
+                                                            self.tr("Short-circuit region"),
+                                                            optional=True))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.EXCLUDE_INCLUDE,
+                                                            self.tr("Focal node pairs to exclude/include"),
+                                                            optional=True))
+        self.addParameter(QgsProcessingParameterBoolean(self.LOW_MEMORY,
+                                                        self.tr("Run in low memory mode"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterString(self.BASENAME,
+                                                       self.tr("Output basename"),
+                                                       "csoutput"))
 
-        self.addParameter(ParameterRaster(self.RESISTANCE_MAP,
-            'Raster resistance map'))
-        self.addParameter(ParameterBoolean(self.IS_CONDUCTANCES,
-            'Data represent conductances instead of resistances', False))
-        self.addParameter(ParameterRaster(self.FOCAL_NODE,
-            'Focal node location'))
-        self.addParameter(ParameterBoolean(self.WRITE_CURRENT_MAP,
-            'Create current map', True))
-        self.addParameter(ParameterBoolean(self.WRITE_VOLTAGE_MAP,
-            'Create voltage map', True))
-        self.addParameter(ParameterRaster(self.MASK,
-            'Raster mask file', optional=True))
-        self.addParameter(ParameterRaster(self.SHORT_CIRCUIT,
-            'Raster short-circuit region file', optional=True))
-        self.addParameter(ParameterRaster(self.EXCLUDE_INCLUDE,
-            'File with focal node pairs to exclude/include', optional=True))
-        self.addParameter(ParameterBoolean(self.LOW_MEMORY,
-            'Run in low memory mode', False))
-        self.addParameter(ParameterString(self.BASENAME,
-            'Output basename', 'csoutput'))
+        self.addParameter(QgsProcessingParameterFolderDestination(self.DIRECTORY,
+                                                                  self.tr("Output directory")))
 
-        self.addOutput(OutputDirectory(self.DIRECTORY, 'Output directory'))
-
-    def processAlgorithm(self, progress):
-        if system.isWindows():
-            path = CircuitscapeUtils.circuitscapePath()
-            if path == '':
-                raise GeoAlgorithmExecutionException(
-                    'Circuitscape folder is not configured.\nPlease '
-                    'configure it before running Circuitscape algorithms.')
-
-        resistance = self.getParameterValue(self.RESISTANCE_MAP)
-        useConductance = str(not self.getParameterValue(self.IS_CONDUCTANCES))
-        focal = self.getParameterValue(self.FOCAL_NODE)
-        writeCurrent = str(self.getParameterValue(self.WRITE_CURRENT_MAP))
-        writeVoltage = str(self.getParameterValue(self.WRITE_VOLTAGE_MAP))
+    def processAlgorithm(self, parameters, context, feedback):
+        resistance = self.parameterAsRasterLayer(parameters, self.RESISTANCE_MAP, context).source()
+        useConductance = str(not self.parameterAsBool(parameters, self.IS_CONDUCTANCES, context))
+        focal = self.parameterAsRasterLayer(parameters, self.FOCAL_NODE, context).source()
+        writeCurrent = str(self.parameterAsBool(parameters, self.WRITE_CURRENT_MAP, context))
+        writeVoltage = str(self.parameterAsBool(parameters, self.WRITE_VOLTAGE_MAP, context))
 
         # advanced parameters
-        mask = self.getParameterValue(self.MASK)
-        shortCircuit = self.getParameterValue(self.SHORT_CIRCUIT)
-        focalPairs = self.getParameterValue(self.EXCLUDE_INCLUDE)
-        lowMemory = str(self.getParameterValue(self.LOW_MEMORY))
+        mask = self.parameterAsRasterLayer(parameters, self.MASK, context)
+        shortCircuit = self.parameterAsRasterLayer(parameters, self.SHORT_CIRCUIT, context)
+        focalPairs = self.parameterAsRasterLayer(parameters, self.EXCLUDE_INCLUDE, context)
+        lowMemory = str(self.parameterAsBool(parameters, self.LOW_MEMORY, context))
 
-        baseName = self.getParameterValue(self.BASENAME)
-        directory = self.getOutputValue(self.DIRECTORY)
+        baseName = self.parameterAsString(parameters, self.BASENAME, context)
+        directory = self.parameterAsString(parameters, self.DIRECTORY, context)
         basePath = os.path.join(directory, baseName)
 
+        commands = self.prepareInputs(parameters, context)
+
         iniPath = CircuitscapeUtils.writeConfiguration()
-        cfg = ConfigParser.SafeConfigParser()
+        cfg = configparser.ConfigParser()
         cfg.read(iniPath)
 
-        commands = self.prepareInputs()
-
         # set parameters
-        cfg.set('Circuitscape mode', 'scenario', 'pairwise')
+        cfg["Circuitscape mode"]["scenario"] = "pairwise"
 
-        cfg.set('Habitat raster or graph',
-                'habitat_map_is_resistances',
-                useConductance)
+        section = cfg["Habitat raster or graph"]
+        section["habitat_map_is_resistances"] = useConductance
         if resistance in self.exportedLayers.keys():
-            resistance = self.exportedLayers[resistance]
-        cfg.set('Habitat raster or graph', 'habitat_file', resistance)
+            section["habitat_file"] = self.exportedLayers[resistance]
 
         if focal in self.exportedLayers.keys():
-            focal = self.exportedLayers[focal]
-        cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-            'point_file', focal)
+            section = cfg["Options for pairwise and one-to-all and all-to-one modes"]
+            section["point_file"] = self.exportedLayers[focal]
+
         if focalPairs is not None:
-            cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-                    'included_pairs_file',
-                    focalPairs)
-            cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-                    'use_included_pairs',
-                    'True')
+            section["included_pairs_file"] = focalPairs
+            section["use_included_pairs"] = "True"
 
         if mask is not None:
             if mask in self.exportedLayers.keys():
-                mask = self.exportedLayers[mask]
-            cfg.set('Mask file', 'mask_file', mask)
-            cfg.set('Mask file', 'use_mask', 'True')
+                section = cfg["Mask file"]
+                section["mask_file"] = self.exportedLayers[mask]
+                section["use_mask"] = "True"
 
         if shortCircuit is not None:
             if shortCircuit in self.exportedLayers.keys():
-                shortCircuit = self.exportedLayers[shortCircuit]
-            cfg.set('Short circuit regions (aka polygons)',
-                    'polygon_file',
-                    shortCircuit)
-            cfg.set('Short circuit regions (aka polygons)',
-                    'use_polygons',
-                    'True')
+                section = cfg["Short circuit regions (aka polygons)"]
+                section["polygon_file"] = self.exportedLayers[shortCircuit]
+                section["use_polygons"] = "True"
 
-        cfg.set('Calculation options', 'low_memory_mode', lowMemory)
+        cfg["Calculation options"]["low_memory_mode"] = lowMemory
+        cfg["Output options"]["write_cur_maps"] = writeCurrent
+        cfg["Output options"]["write_volt_maps"] = writeVoltage
+        cfg["Output options"]["output_file"] = basePath
 
-        cfg.set('Output options', 'write_cur_maps', writeCurrent)
-        cfg.set('Output options', 'write_volt_maps', writeVoltage)
-        cfg.set('Output options', 'output_file', basePath)
-
-        # write configuration back to file
-        with open(iniPath, 'wb') as f:
+        # write configuration back to the file
+        with open(iniPath, "w") as f:
             cfg.write(f)
 
         if system.isWindows():
-            commands.append('"{}" {}'.format(os.path.join(path, 'cs_run.exe'), iniPath))
+            csPath = CircuitscapeUtils.circuitscapeDirectory()
+            if csPath == "":
+                csPath = "cs_run.exe"
+            else:
+                csPath = os.path.join(csPath, "cs_run.exe")
+
+            commands.append('"{}" {}'.format(csPath, iniPath))
         else:
-            commands.append('csrun.py {}'.format(iniPath))
+            commands.append("csrun.py {}".format(iniPath))
 
-        CircuitscapeUtils.createBatchJobFileFromCommands(commands)
-        loglines = []
-        loglines.append('Circuitscape execution commands')
-        for line in commands:
-            progress.setCommand(line)
-            loglines.append(line)
-
-        if ProcessingConfig.getSetting(CircuitscapeUtils.LOG_COMMANDS):
-            ProcessingLog.addToLog(ProcessingLog.LOG_INFO, loglines)
-
-        CircuitscapeUtils.executeCircuitscape(commands, progress)
+        CircuitscapeUtils.jobFileFromCommands(commands)
+        CircuitscapeUtils.execute(feedback)

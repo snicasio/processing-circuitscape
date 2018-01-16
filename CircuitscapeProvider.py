@@ -5,7 +5,7 @@
     CircuitscapeProvider.py
     ---------------------
     Date                 : May 2014
-    Copyright            : (C) 2014-2017 by Alexander Bruy
+    Copyright            : (C) 2014-2018 by Alexander Bruy
     Email                : alexander dot bruy at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -19,7 +19,7 @@
 
 __author__ = 'Alexander Bruy'
 __date__ = 'May 2014'
-__copyright__ = '(C) 2014-2017, Alexander Bruy'
+__copyright__ = '(C) 2014-2018, Alexander Bruy'
 
 # This will get replaced with a git SHA1 when you do a git archive
 
@@ -28,91 +28,97 @@ __revision__ = '$Format:%H$'
 import os
 
 from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtCore import QCoreApplication
 
-from processing.core.AlgorithmProvider import AlgorithmProvider
-from processing.core.ProcessingConfig import Setting, ProcessingConfig
-from processing.tools import system
+from qgis.core import QgsProcessingProvider
+
+from processing.core.ProcessingConfig import ProcessingConfig, Setting
+from processing.tools.system import isWindows
 
 from processing_circuitscape.Pairwise import Pairwise
 from processing_circuitscape.OneToAll import OneToAll
 from processing_circuitscape.Advanced import Advanced
-from processing_circuitscape.CircuitscapeUtils import CircuitscapeUtils
+from processing_circuitscape import CircuitscapeUtils
 
 pluginPath = os.path.dirname(__file__)
 
 
-class CircuitscapeProvider(AlgorithmProvider):
+class CircuitscapeProvider(QgsProcessingProvider):
 
     def __init__(self):
-        AlgorithmProvider.__init__(self)
+        super().__init__()
+        self.algs = []
 
-        self.activate = False
+    def id(self):
+        return "circuitscape"
 
-        self.alglist = [Pairwise(), OneToAll(), Advanced()]
-        for alg in self.alglist:
-            alg.provider = self
+    def name(self):
+        return "Circuitscape"
 
-    def initializeSettings(self):
-        AlgorithmProvider.initializeSettings(self)
+    def icon(self):
+        return QIcon(os.path.join(pluginPath, "icons", "circuitscape.png"))
 
-        if system.isWindows():
-            ProcessingConfig.addSetting(Setting(self.getDescription(),
-                CircuitscapeUtils.CIRCUITSCAPE_FOLDER,
-                'Circuitscape folder',
-                CircuitscapeUtils.circuitscapePath()))
+    def load(self):
+        ProcessingConfig.settingIcons[self.name()] = self.icon()
 
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.LOG_COMMANDS,
-            'Log execution commands',
-            True))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.LOG_CONSOLE,
-            'Log console output',
-            True))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.CIRCUITSCAPE_ACTIVE,
+                                            self.tr("Activate"),
+                                            False))
+        if isWindows():
+            ProcessingConfig.addSetting(Setting(self.name(),
+                                                CircuitscapeUtils.CIRCUITSCAPE_DIRECTORY,
+                                                self.tr("Circuitscape directory"),
+                                                CircuitscapeUtils.circuitscapeDirectory(),
+                                                valuetype=Setting.FOLDER))
 
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.FOUR_NEIGHBOURS,
-            'Connect raster cells to four neighbors instead of eight',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.AVERAGE_CONDUCTANCE,
-            'Use average conductance instead of resistance for connections '
-            'between cells',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.PREEMPT_MEMORY,
-            'Preemptively release memory when possible',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.MAX_CURRENT_MAPS,
-            'Write maximum of current maps',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.CUM_MAX_MAPS,
-            'Write cumulative & maximum current maps only',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.ZERO_FOCAL,
-            'Set focal nodes currents to zero',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.LOG_TRANSFORM,
-            'Log-transform current maps',
-            False))
-        ProcessingConfig.addSetting(Setting(self.getDescription(),
-            CircuitscapeUtils.COMPRESS_OUTPUT,
-            'Compress output grids',
-            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.CIRCUITSCAPE_VERBOSE,
+                                            self.tr("Log commands output"),
+                                            False))
+
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.FOUR_NEIGHBOURS,
+                                            self.tr("Connect raster cells to 4 neighbors instead of 8"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.AVERAGE_CONDUCTANCE,
+                                            self.tr("Use average conductance instead of resistance for connections between cells"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.PREEMPT_MEMORY,
+                                            self.tr("Preemptively release memory when possible"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.MAX_CURRENT_MAPS,
+                                            self.tr("Write maximum of current maps"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.CUM_MAX_MAPS,
+                                            self.tr("Write cumulative & maximum current maps only"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.ZERO_FOCAL,
+                                            self.tr("Set focal nodes currents to zero"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.LOG_TRANSFORM,
+                                            self.tr("Log-transform current maps"),
+                                            False))
+        ProcessingConfig.addSetting(Setting(self.name(),
+                                            CircuitscapeUtils.COMPRESS_OUTPUT,
+                                            self.tr("Compress output grids"),
+                                            False))
+
+        ProcessingConfig.readSettings()
+        self.refreshAlgorithms()
+        return True
 
     def unload(self):
-        AlgorithmProvider.unload(self)
-
-        if system.isWindows():
-            ProcessingConfig.removeSetting(
-                CircuitscapeUtils.CIRCUITSCAPE_FOLDER)
-
-        ProcessingConfig.removeSetting(CircuitscapeUtils.LOG_COMMANDS)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.LOG_CONSOLE)
+        ProcessingConfig.removeSetting(CircuitscapeUtils.CIRCUITSCAPE_ACTIVE)
+        if isWindows():
+            ProcessingConfig.removeSetting(CircuitscapeUtils.CIRCUITSCAPE_DIRECTORY)
+        ProcessingConfig.removeSetting(CircuitscapeUtils.CIRCUITSCAPE_VERBOSE)
 
         ProcessingConfig.removeSetting(CircuitscapeUtils.FOUR_NEIGHBOURS)
         ProcessingConfig.removeSetting(CircuitscapeUtils.AVERAGE_CONDUCTANCE)
@@ -123,14 +129,29 @@ class CircuitscapeProvider(AlgorithmProvider):
         ProcessingConfig.removeSetting(CircuitscapeUtils.LOG_TRANSFORM)
         ProcessingConfig.removeSetting(CircuitscapeUtils.COMPRESS_OUTPUT)
 
-    def getName(self):
-        return 'Circuitscape'
+    def isActive(self):
+        return ProcessingConfig.getSetting(CircuitscapeUtils.CIRCUITSCAPE_ACTIVE)
 
-    def getDescription(self):
-        return 'Circuitscape'
+    def setActive(self, active):
+        ProcessingConfig.setSettingValue(CircuitscapeUtils.CIRCUITSCAPE_ACTIVE, active)
 
-    def getIcon(self):
-        return QIcon(os.path.join(pluginPath, 'icons', 'circuitscape.png'))
+    def supportsNonFileBasedOutput(self):
+        return False
 
-    def _loadAlgorithms(self):
-        self.algs = self.alglist
+    def getAlgs(self):
+        algs = [Pairwise(),
+                OneToAll(),
+                Advanced()
+               ]
+
+        return algs
+
+    def loadAlgorithms(self):
+        self.algs = self.getAlgs()
+        for a in self.algs:
+            self.addAlgorithm(a)
+
+    def tr(self, string, context=''):
+        if context == "":
+            context = "CircuitscapeProvider"
+        return QCoreApplication.translate(context, string)

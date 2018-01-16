@@ -5,7 +5,7 @@
     CircuitscapeAlgorithm.py
     ---------------------
     Date                 : June 2014
-    Copyright            : (C) 2014-2017 by Alexander Bruy
+    Copyright            : (C) 2014-2018 by Alexander Bruy
     Email                : alexander dot bruy at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -19,7 +19,7 @@
 
 __author__ = 'Alexander Bruy'
 __date__ = 'June 2014'
-__copyright__ = '(C) 2014-2017, Alexander Bruy'
+__copyright__ = '(C) 2014-2018, Alexander Bruy'
 
 # This will get replaced with a git SHA1 when you do a git archive
 
@@ -27,29 +27,32 @@ __revision__ = '$Format:%H$'
 
 import os
 
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 
-from processing.core.GeoAlgorithm import GeoAlgorithm
-from processing.core.parameters import ParameterRaster
-
-from processing.tools import system
-
-from CircuitscapeUtils import CircuitscapeUtils
+from qgis.core import (QgsProcessingAlgorithm,
+                       QgsProcessingUtils,
+                       QgsProcessingParameterRasterLayer
+                      )
 
 pluginPath = os.path.dirname(__file__)
 
 sessionExportedLayers = {}
 
 
-class CircuitscapeAlgorithm(GeoAlgorithm):
+class CircuitscapeAlgorithm(QgsProcessingAlgorithm):
 
     def __init__(self):
-        GeoAlgorithm.__init__(self)
+        super().__init__()
 
-        self.exportedLayers = {}
+    def createInstance(self):
+        return type(self)()
 
-    def getIcon(self):
-        return QIcon(os.path.join(pluginPath, 'icons', 'circuitscape.png'))
+    def icon(self):
+        return QIcon(os.path.join(pluginPath, "icons", "circuitscape.png"))
+
+    def tr(self, text):
+        return QCoreApplication.translate(self.__class__.__name__, text)
 
     def exportRasterLayer(self, source):
         global sessionExportedLayers
@@ -60,27 +63,27 @@ class CircuitscapeAlgorithm(GeoAlgorithm):
 
         fileName = os.path.basename(source)
         validChars = \
-            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:'
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         fileName = ''.join(c for c in fileName if c in validChars)
         if len(fileName) == 0:
             fileName = 'layer'
 
-        destFilename = system.getTempFilenameInTempFolder(fileName + '.asc')
+        destFilename = QgsProcessingUtils.generateTempFilename("{}.asc".format(fileName))
         self.exportedLayers[source] = destFilename
         sessionExportedLayers[source] = destFilename
 
-        return 'gdal_translate -of AAIGrid {} {}'.format(source, destFilename)
+        return "gdal_translate -of AAIGrid {} {}".format(source, destFilename)
 
-    def prepareInputs(self):
+    def prepareInputs(self, parameters, context):
         commands = []
         self.exportedLayers = {}
-        for param in self.parameters:
-            if isinstance(param, ParameterRaster):
-                if param.value is None:
+        for param in self.parameterDefinitions():
+            if isinstance(param, QgsProcessingParameterRasterLayer):
+                layer = self.parameterAsRasterLayer(parameters, param.name(), context)
+                if layer is None:
                     continue
-                value = param.value
-                if not value.lower().endswith('asc'):
-                    exportCommand = self.exportRasterLayer(value)
+                if not layer.source().lower().endswith("asc"):
+                    exportCommand = self.exportRasterLayer(layer.source())
                     if exportCommand is not None:
                         commands.append(exportCommand)
         return commands

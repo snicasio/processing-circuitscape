@@ -5,7 +5,7 @@
     CircuitscapeUtils.py
     ---------------------
     Date                 : May 2014
-    Copyright            : (C) 2014-2017 by Alexander Bruy
+    Copyright            : (C) 2014-2018 by Alexander Bruy
     Email                : alexander dot bruy at gmail dot com
 ***************************************************************************
 *                                                                         *
@@ -19,7 +19,7 @@
 
 __author__ = 'Alexander Bruy'
 __date__ = 'May 2014'
-__copyright__ = '(C) 2014-2017, Alexander Bruy'
+__copyright__ = '(C) 2014-2018, Alexander Bruy'
 
 # This will get replaced with a git SHA1 when you do a git archive
 
@@ -28,187 +28,167 @@ __revision__ = '$Format:%H$'
 import os
 import stat
 import subprocess
-import ConfigParser
+import configparser
 
+from qgis.core import QgsMessageLog, QgsProcessingFeedback, QgsProcessingUtils
 from processing.core.ProcessingLog import ProcessingLog
 from processing.core.ProcessingConfig import ProcessingConfig
-from processing.tools.system import getTempFilename, isWindows
+
+from processing.tools.system import isWindows, userFolder
+
+CIRCUITSCAPE_ACTIVE = "CIRCUITSCAPE_ACTIVE"
+CIRCUITSCAPE_DIRECTORY = "CIRCUITSCAPE_DIRECTORY"
+CIRCUITSCAPE_VERBOSE = "CIRCUITSCAPE_VERBOSE"
+
+FOUR_NEIGHBOURS = "FOUR_NEIGHBOURS"
+AVERAGE_CONDUCTANCE = "AVERAGE_CONDUCTANCE"
+PREEMPT_MEMORY = "PREEMPT_MEMORY"
+MAX_CURRENT_MAPS = "MAX_CURRENT_MAPS"
+CUM_MAX_MAPS = "CUM_MAX_MAPS"
+ZERO_FOCAL = "ZERO_FOCAL"
+COMPRESS_OUTPUT = "COMPRESS_OUTPUT"
+LOG_TRANSFORM = "LOG_TRANSFORM"
 
 
-class CircuitscapeUtils:
+def circuitscapeDirectory():
+    filePath = ProcessingConfig.getSetting(CIRCUITSCAPE_DIRECTORY)
+    return filePath if filePath is not None else ""
 
-    LOG_COMMANDS = 'LOG_COMMANDS'
-    LOG_CONSOLE = 'LOG_CONSOLE'
-    CIRCUITSCAPE_FOLDER = 'CIRCUITSCAPE_FOLDER'
-    FOUR_NEIGHBOURS = 'FOUR_NEIGHBOURS'
-    AVERAGE_CONDUCTANCE = 'AVERAGE_CONDUCTANCE'
-    PREEMPT_MEMORY = 'PREEMPT_MEMORY'
-    MAX_CURRENT_MAPS = 'MAX_CURRENT_MAPS'
-    CUM_MAX_MAPS = 'CUM_MAX_MAPS'
-    ZERO_FOCAL = 'ZERO_FOCAL'
-    COMPRESS_OUTPUT = 'COMPRESS_OUTPUT'
-    LOG_TRANSFORM = 'LOG_TRANSFORM'
 
-    @staticmethod
-    def circuitscapePath():
-        folder = ProcessingConfig.getSetting(
-            CircuitscapeUtils.CIRCUITSCAPE_FOLDER)
-        if folder is None or folder == '':
-            folder = ''
-            if isWindows():
-                testPath = 'C:/Program Files/Circuitscape'
-                if os.path.exists(os.path.join(testPath, 'cs_run.exe')):
-                    folder = testPath
-        return folder
+def writeConfiguration():
+    cfg = configparser.ConfigParser()
 
-    @staticmethod
-    def writeConfiguration():
-        cfg = ConfigParser.SafeConfigParser()
+    cfg["Options for advanced mode"] = {}
+    section = cfg["Options for advanced mode"]
+    section["ground_file_is_resistances"] = "True"
+    section["remove_src_or_gnd"] = "keepall"
+    section["ground_file"] = ""
+    section["use_unit_currents"] = "False"
+    section["source_file"] = ""
+    section["use_direct_grounds"] = "False"
 
-        cfg.add_section('Options for advanced mode')
-        cfg.set(
-            'Options for advanced mode', 'ground_file_is_resistances', 'True')
-        cfg.set('Options for advanced mode', 'remove_src_or_gnd', 'keepall')
-        cfg.set('Options for advanced mode', 'ground_file', '')
-        cfg.set('Options for advanced mode', 'use_unit_currents', 'False')
-        cfg.set('Options for advanced mode', 'source_file', '')
-        cfg.set('Options for advanced mode', 'use_direct_grounds', 'False')
+    cfg["Mask file"] = {}
+    section = cfg["Mask file"]
+    section["mask_file"] = ""
+    section["use_mask"] = "False"
 
-        cfg.add_section('Mask file')
-        cfg.set('Mask file', 'mask_file', '')
-        cfg.set('Mask file', 'use_mask', 'False')
+    cfg["Calculation options"] = {}
+    section = cfg["Calculation options"]
+    section["low_memory_mode"] = "False"
+    section["parallelize"] = "False"
+    section["solver"] = "cg+amg"
+    section["print_timings"] = "True"
+    section["preemptive_memory_release"] = str(ProcessingConfig.getSetting(PREEMPT_MEMORY))
+    section["print_rusages"] = "False"
+    section["max_parallel"] = "0"
 
-        cfg.add_section('Calculation options')
-        cfg.set('Calculation options', 'low_memory_mode', 'False')
-        cfg.set('Calculation options', 'parallelize', 'False')
-        cfg.set('Calculation options', 'solver', 'cg+amg')
-        cfg.set('Calculation options', 'print_timings', 'True')
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.PREEMPT_MEMORY))
-        cfg.set('Calculation options', 'preemptive_memory_release', value)
-        cfg.set('Calculation options', 'print_rusages', 'False')
-        cfg.set('Calculation options', 'max_parallel', '0')
+    cfg["Short circuit regions (aka polygons)"] = {}
+    section = cfg["Short circuit regions (aka polygons)"]
+    section["polygon_file"] = ""
+    section["use_polygons"] = "False"
 
-        cfg.add_section('Short circuit regions (aka polygons)')
-        cfg.set('Short circuit regions (aka polygons)', 'polygon_file', '')
-        cfg.set('Short circuit regions (aka polygons)',
-            'use_polygons', 'False')
+    cfg["Options for one-to-all and all-to-one modes"] = {}
+    section = cfg["Options for one-to-all and all-to-one modes"]
+    section["use_variable_source_strengths"] = "False"
+    section["variable_source_file"] = ""
 
-        cfg.add_section('Options for one-to-all and all-to-one modes')
-        cfg.set('Options for one-to-all and all-to-one modes',
-            'use_variable_source_strengths', 'False')
-        cfg.set('Options for one-to-all and all-to-one modes',
-            'variable_source_file', '')
+    cfg["Output options"] = {}
+    section = cfg["Output options"]
+    section["set_null_currents_to_nodata"] = "False"
+    section["set_focal_node_currents_to_zero"] = str(ProcessingConfig.getSetting(ZERO_FOCAL))
+    section["set_null_voltages_to_nodata"] = "False"
+    section["compress_grids"] = str(ProcessingConfig.getSetting(COMPRESS_OUTPUT))
+    section["write_cur_maps"] = "True"
+    section["write_volt_maps"] = "True"
+    section["output_file"] = ""
+    section["write_cum_cur_map_only"] = str(ProcessingConfig.getSetting(CUM_MAX_MAPS))
+    section["log_transform_maps"] = str(ProcessingConfig.getSetting(LOG_TRANSFORM))
+    section["write_max_cur_maps"] = str(ProcessingConfig.getSetting(MAX_CURRENT_MAPS))
 
-        cfg.add_section('Output options')
-        cfg.set('Output options', 'set_null_currents_to_nodata', 'False')
-        value = str(ProcessingConfig.getSetting(CircuitscapeUtils.ZERO_FOCAL))
-        cfg.set('Output options', 'set_focal_node_currents_to_zero', value)
-        cfg.set('Output options', 'set_null_voltages_to_nodata', 'False')
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.COMPRESS_OUTPUT))
-        cfg.set('Output options', 'compress_grids', value)
-        cfg.set('Output options', 'write_cur_maps', 'True')
-        cfg.set('Output options', 'write_volt_maps', 'True')
-        cfg.set('Output options', 'output_file', '')
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.CUM_MAX_MAPS))
-        cfg.set('Output options', 'write_cum_cur_map_only', value)
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.LOG_TRANSFORM))
-        cfg.set('Output options', 'log_transform_maps', value)
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.MAX_CURRENT_MAPS))
-        cfg.set('Output options', 'write_max_cur_maps', value)
+    cfg["Options for reclassification of habitat data"] = {}
+    section = cfg["Options for reclassification of habitat data"]
+    section["reclass_file"] = ""
+    section["use_reclass_table"] = "False"
 
-        cfg.add_section('Options for reclassification of habitat data')
-        cfg.set('Options for reclassification of habitat data',
-            'reclass_file', '')
-        cfg.set('Options for reclassification of habitat data',
-            'use_reclass_table', 'False')
+    cfg["Logging Options"] = {}
+    section = cfg["Logging Options"]
+    section["log_level"] = "INFO"
+    section["log_file"] = "None"
+    section["profiler_log_file"] = "None"
+    section["screenprint_log"] = "False"
 
-        cfg.add_section('Logging Options')
-        cfg.set('Logging Options', 'log_level', 'INFO')
-        cfg.set('Logging Options', 'log_file', 'None')
-        cfg.set('Logging Options', 'profiler_log_file', 'None')
-        cfg.set('Logging Options', 'screenprint_log', 'False')
+    cfg["Options for pairwise and one-to-all and all-to-one modes"] = {}
+    section = cfg["Options for pairwise and one-to-all and all-to-one modes"]
+    section["included_pairs_file"] = ""
+    section["use_included_pairs"] = "False"
+    section["point_file"] = ""
 
-        cfg.add_section(
-            'Options for pairwise and one-to-all and all-to-one modes')
-        cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-            'included_pairs_file', '')
-        cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-            'use_included_pairs', 'False')
-        cfg.set('Options for pairwise and one-to-all and all-to-one modes',
-            'point_file', '')
+    cfg["Connection scheme for raster habitat data"] = {}
+    section = cfg["Connection scheme for raster habitat data"]
+    section["connect_using_avg_resistances"] = str(ProcessingConfig.getSetting(AVERAGE_CONDUCTANCE))
+    section["connect_four_neighbors_only"] = str(ProcessingConfig.getSetting(FOUR_NEIGHBOURS))
 
-        cfg.add_section('Connection scheme for raster habitat data')
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.AVERAGE_CONDUCTANCE))
-        cfg.set('Connection scheme for raster habitat data',
-            'connect_using_avg_resistances', value)
-        value = str(
-            ProcessingConfig.getSetting(CircuitscapeUtils.FOUR_NEIGHBOURS))
-        cfg.set('Connection scheme for raster habitat data',
-            'connect_four_neighbors_only', value)
+    cfg["Habitat raster or graph"] = {}
+    section = cfg["Habitat raster or graph"]
+    section["habitat_map_is_resistances"] = "True"
+    section["Habitat raster or graph"] = "habitat_file"
 
-        cfg.add_section('Habitat raster or graph')
-        cfg.set('Habitat raster or graph',
-            'habitat_map_is_resistances', 'True')
-        cfg.set('Habitat raster or graph', 'habitat_file', '')
+    cfg["Circuitscape mode"] = {}
+    section["data_type"] = "raster"
+    section["scenario"] = ""
 
-        cfg.add_section('Circuitscape mode')
-        cfg.set('Circuitscape mode', 'data_type', 'raster')
-        cfg.set('Circuitscape mode', 'scenario', '')
+    iniPath = QgsProcessingUtils.generateTempFilename("circuitscape.ini")
+    with open(iniPath, "w") as f:
+        cfg.write(f)
 
-        iniPath = getTempFilename('.ini')
-        with open(iniPath, 'wb') as f:
-            cfg.write(f)
+    return iniPath
 
-        return iniPath
 
-    @staticmethod
-    def batchJobFilename():
-        if isWindows():
-            fileName = 'circuitscape_batch_job.bat'
-        else:
-            fileName = 'circuitscape_batch_job.sh'
+def batchJobFilename():
+    if isWindows():
+        fileName = "circuitscape_batch_job.bat"
+    else:
+        fileName = "circuitscape_batch_job.sh"
 
-        batchFile = userFolder() + os.sep + fileName
+    batchFile = userFolder() + os.sep + fileName
 
-        return batchFile
+    return batchFile
 
-    @staticmethod
-    def createBatchJobFileFromCommands(commands):
-        batchFile = open(CircuitscapeUtils.batchJobFilename(), 'w')
+
+def jobFileFromCommands(commands):
+    with open(batchJobFilename(), "w") as f:
         for command in commands:
-            batchFile.write(command.encode('utf8') + '\n')
+            f.write("{}\n".format(command))
 
-        batchFile.write('exit')
-        batchFile.close()
+        f.write("exit")
 
-    @staticmethod
-    def executeCircuitscape(command, progress):
-        if isWindows():
-            command = ['cmd.exe', '/C ', CircuitscapeUtils.batchJobFilename()]
-        else:
-            os.chmod(CircuitscapeUtils.batchJobFilename(), stat.S_IEXEC
-                     | stat.S_IREAD | stat.S_IWRITE)
-            command = [CircuitscapeUtils.batchJobFilename()]
 
-        fused_command = ''.join(['"%s" ' % c for c in command])
-        loglines = []
-        loglines.append('Circuitscape execution console output')
-        proc = subprocess.Popen(
-            fused_command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            ).stdout
-        for line in iter(proc.readline, ''):
-            loglines.append(line)
+def execute(feedback):
+    if isWindows():
+        commands = ["cmd.exe", "/C", batchJobFilename()]
+    else:
+        os.chmod(batchJobFilename(), stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
+        commands = [batchJobFilename()]
 
-        if ProcessingConfig.getSetting(CircuitscapeUtils.LOG_CONSOLE):
-            ProcessingLog.addToLog(ProcessingLog.LOG_INFO, loglines)
+    fused_command = " ".join([str(c) for c in commands])
+    QgsMessageLog.logMessage(fused_command, "Processing", QgsMessageLog.INFO)
+    feedback.pushInfo("Circuitscape command:")
+    feedback.pushCommandInfo(fused_command)
+    feedback.pushInfo("Circuitscape command output:")
+
+    loglines = []
+    with subprocess.Popen(fused_command,
+                          shell=True,
+                          stdout=subprocess.PIPE,
+                          stdin=subprocess.DEVNULL,
+                          stderr=subprocess.STDOUT,
+                          universal_newlines=True) as proc:
+        try:
+            for line in iter(proc.stdout.readline, ""):
+                feedback.pushConsoleInfo(line)
+                loglines.append(line)
+        except:
+            pass
+
+    if ProcessingConfig.getSetting(CIRCUITSCAPE_VERBOSE):
+        QgsMessageLog.logMessage("\n".join(loglines), "Processing", QgsMessageLog.INFO)
