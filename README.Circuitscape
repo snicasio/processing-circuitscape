@@ -2,10 +2,8 @@ To use this plugin you need to install Circuitscape package.
 
 Windows
 -------
-Please visit Circuitscape homepage for installer packages for 32bit and
-64bit systems.
-
-Circuitscape download area: http://www.circuitscape.org/downloads
+Please visit Circuitscape homepage http://www.circuitscape.org/downloads for
+installer packages for 32bit and 64bit systems.
 
 After installing Circuitscape and plugin you should configure Circuitscape
 folder (usually this is directory where Circuitscape is installed and
@@ -13,7 +11,6 @@ where sc_run.exe file located) in Processing options dialog.
 
 Linux
 -----
-Please visit Circuitscape homepage for Python source package or check
-if this package available from your package manager.
-
-Circuitscape download area: http://www.circuitscape.org/downloads
+Please visit Circuitscape homepage http://www.circuitscape.org/downloads for
+Python source package or check if this package available from your package
+manager.
