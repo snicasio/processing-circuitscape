@@ -2,7 +2,7 @@
 
 """
 ***************************************************************************
-    OneToAll.py
+    Advanced.py
     ---------------------
     Date                 : May 2014
     Copyright            : (C) 2014-2018 by Alexander Bruy
@@ -38,29 +38,32 @@ from qgis.core import (QgsProcessing,
 from processing.core.ProcessingConfig import ProcessingConfig
 from processing.tools import system
 
-from processing_circuitscape.CircuitscapeAlgorithm import CircuitscapeAlgorithm
-from processing_circuitscape import CircuitscapeUtils
+from processing_circuitscape.circuitscapeAlgorithm import CircuitscapeAlgorithm
+from processing_circuitscape import circuitscapeUtils
 
 
-class OneToAll(CircuitscapeAlgorithm):
+class Advanced(CircuitscapeAlgorithm):
 
-    MODE = "MODE"
     RESISTANCE_MAP = "RESISTANCE_MAP"
     IS_CONDUCTANCES = "IS_CONDUCTANCES"
-    FOCAL_NODE = "FOCAL_NODE"
+    CURRENT_SOURCE = "CURRENT_SOURCE"
+    GROUND_POINT = "GROUND_POINT"
+    GP_CONDUCTANCES = "GP_CONDUCTANCES"
+    MODE = "MODE"
+    UNIT_CURRENTS = "UNIT_CURRENTS"
+    DIRECT_CONNECTIONS = "DIRECT_CONNECTIONS"
     WRITE_CURRENT_MAP = "WRITE_CURRENT_MAP"
     WRITE_VOLTAGE_MAP = "WRITE_VOLTAGE_MAP"
     MASK = "MASK"
     SHORT_CIRCUIT = "SHORT_CIRCUIT"
-    SOURCE_STRENGTH = "SOURCE_STRENGTH"
     BASENAME = "BASENAME"
     DIRECTORY = "DIRECTORY"
 
     def name(self):
-        return "onetoall"
+        return "advanced"
 
     def displayName(self):
-        return self.tr("One-to-all / All-to-one")
+        return self.tr("Advanced")
 
     def group(self):
         return self.tr("Circuitscape")
@@ -72,21 +75,34 @@ class OneToAll(CircuitscapeAlgorithm):
         super().__init__()
 
     def initAlgorithm(self, config=None):
-        self.modes = ((self.tr("One to all"), "one-to-all"),
-                      (self.tr("All to one"), "all-to-one"))
+        self.modes = ((self.tr("Keep both when possible"), "keepall"),
+                      (self.tr("Remove source"), "rmvsrc"),
+                      (self.tr("Remove ground"), "rmvgnd"),
+                      (self.tr("Remove both"), "rmvall"))
 
-        self.addParameter(QgsProcessingParameterEnum(self.MODE,
-                                                     self.tr("Modelling mode"),
-                                                     options=[i[0] for i in self.modes],
-                                                     allowMultiple=False,
-                                                     defaultValue=0))
         self.addParameter(QgsProcessingParameterRasterLayer(self.RESISTANCE_MAP,
-                                                            self.tr("Resistance map")))
+                                                            self.tr("Raster resistance map")))
         self.addParameter(QgsProcessingParameterBoolean(self.IS_CONDUCTANCES,
                                                         self.tr("Data represent conductances instead of resistances"),
                                                         False))
-        self.addParameter(QgsProcessingParameterRasterLayer(self.FOCAL_NODE,
-                                                            self.tr("Focal node location")))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.CURRENT_SOURCE,
+                                                            self.tr("Current source")))
+        self.addParameter(QgsProcessingParameterRasterLayer(self.GROUND_POINT,
+                                                            self.tr("Ground point")))
+        self.addParameter(QgsProcessingParameterBoolean(self.GP_CONDUCTANCES,
+                                                        self.tr("Data represent conductances instead of resistances to ground"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterEnum(self.MODE,
+                                                     self.tr("When a source and ground are at the same node"),
+                                                     options=[i[0] for i in self.modes],
+                                                     allowMultiple=False,
+                                                     defaultValue=0))
+        self.addParameter(QgsProcessingParameterBoolean(self.UNIT_CURRENTS,
+                                                        self.tr("Use unit currents (i = 1) for all current sources"),
+                                                        False))
+        self.addParameter(QgsProcessingParameterBoolean(self.DIRECT_CONNECTIONS,
+                                                        self.tr("Use direct connections to ground (R = 0) for all ground points"),
+                                                        False))
         self.addParameter(QgsProcessingParameterBoolean(self.WRITE_CURRENT_MAP,
                                                         self.tr("Create current map"),
                                                         True))
@@ -99,9 +115,6 @@ class OneToAll(CircuitscapeAlgorithm):
         self.addParameter(QgsProcessingParameterRasterLayer(self.SHORT_CIRCUIT,
                                                             self.tr("Short-circuit region"),
                                                             optional=True))
-        self.addParameter(QgsProcessingParameterRasterLayer(self.SOURCE_STRENGTH,
-                                                            self.tr("Source strength"),
-                                                            optional=True))
         self.addParameter(QgsProcessingParameterString(self.BASENAME,
                                                        self.tr("Output basename"),
                                                        "csoutput"))
@@ -110,17 +123,20 @@ class OneToAll(CircuitscapeAlgorithm):
                                                                   self.tr("Output directory")))
 
     def processAlgorithm(self, parameters, context, feedback):
-        mode = self.modes[self.parameterAsEnum(parameters, self.MODE, context)][1]
         resistance = self.parameterAsRasterLayer(parameters, self.RESISTANCE_MAP, context).source()
         useConductance = str(not self.parameterAsBool(parameters, self.IS_CONDUCTANCES, context))
-        focal = self.parameterAsRasterLayer(parameters, self.FOCAL_NODE, context).source()
+        currentSources = self.parameterAsRasterLayer(parameters, self.CURRENT_SOURCE, context).source()
+        groundPoints = self.parameterAsRasterLayer(parameters, self.GROUND_POINT, context)
+        gpConductance = str(not self.parameterAsBool(parameters, self.GP_CONDUCTANCES, context))
         writeCurrent = str(self.parameterAsBool(parameters, self.WRITE_CURRENT_MAP, context))
         writeVoltage = str(self.parameterAsBool(parameters, self.WRITE_VOLTAGE_MAP, context))
 
         # advanced parameters
+        mode = self.modes[self.parameterAsEnum(parameters, self.MODE, context)][1]
+        unitCurrents = str(self.parameterAsBool(parameters, self.UNIT_CURRENTS, context))
+        directConnections = str(self.parameterAsBool(parameters, self.DIRECT_CONNECTIONS, context))
         mask = self.parameterAsRasterLayer(parameters, self.MASK, context)
         shortCircuit = self.parameterAsRasterLayer(parameters, self.SHORT_CIRCUIT, context)
-        sourceStrength = self.parameterAsRasterLayer(parameters, self.SOURCE_STRENGTH, context)
 
         baseName = self.parameterAsString(parameters, self.BASENAME, context)
         directory = self.parameterAsString(parameters, self.DIRECTORY, context)
@@ -128,27 +144,28 @@ class OneToAll(CircuitscapeAlgorithm):
 
         commands = self.prepareInputs(parameters, context)
 
-        iniPath = CircuitscapeUtils.writeConfiguration()
+        iniPath = circuitscapeUtils.writeConfiguration()
         cfg = configparser.ConfigParser()
         cfg.read(iniPath)
 
         # set parameters
-        cfg["Circuitscape mode"]["scenario"] = mode
+        cfg["Circuitscape mode"]["scenario"] = "advanced"
 
         section = cfg["Habitat raster or graph"]
         section["habitat_map_is_resistances"] = useConductance
         if resistance in self.exportedLayers.keys():
             section["habitat_file"] = self.exportedLayers[resistance]
 
-        if focal in self.exportedLayers.keys():
-            section = cfg["Options for pairwise and one-to-all and all-to-one modes"]
-            section["point_file"] = self.exportedLayers[focal]
+        section = cfg["Options for advanced mode"]
+        if currentSources in self.exportedLayers.keys():
+            section["source_file"] = self.exportedLayers[currentSources]
 
-        if sourceStrength is not None:
-            if sourceStrength in self.exportedLayers.keys():
-                section = cfg["Options for one-to-all and all-to-one modes"]
-                section["variable_source_file"] = self.exportedLayers[sourceStrength]
-                section["use_variable_source_strengths"] = "True"
+        if groundPoints in self.exportedLayers.keys():
+            section["ground_file"] = self.exportedLayers[groundPoints]
+
+        section["ground_file_is_resistances"] = gpConductance
+        section["remove_src_or_gnd"] = unitCurrents
+        section["use_direct_grounds"] = directConnections
 
         if mask is not None:
             if mask in self.exportedLayers.keys():
@@ -171,7 +188,7 @@ class OneToAll(CircuitscapeAlgorithm):
             cfg.write(f)
 
         if system.isWindows():
-            csPath = CircuitscapeUtils.circuitscapeDirectory()
+            csPath = circuitscapeUtils.circuitscapeDirectory()
             if csPath == "":
                 csPath = "cs_run.exe"
             else:
@@ -181,5 +198,5 @@ class OneToAll(CircuitscapeAlgorithm):
         else:
             commands.append("csrun.py {}".format(iniPath))
 
-        CircuitscapeUtils.jobFileFromCommands(commands)
-        CircuitscapeUtils.execute(feedback)
+        circuitscapeUtils.jobFileFromCommands(commands)
+        circuitscapeUtils.execute(feedback)

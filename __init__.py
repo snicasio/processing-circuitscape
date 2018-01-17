@@ -25,8 +25,7 @@ __copyright__ = '(C) 2014-2018, Alexander Bruy'
 
 __revision__ = '$Format:%H$'
 
-from processing_circuitscape.CircuitscapeProviderPlugin import \
-    CircuitscapeProviderPlugin
+from processing_circuitscape.circuitscapeProviderPlugin import CircuitscapeProviderPlugin
 
 
 def classFactory(iface):

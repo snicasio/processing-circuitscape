@@ -37,8 +37,8 @@ from qgis.core import (QgsProcessing,
 from processing.core.ProcessingConfig import ProcessingConfig
 from processing.tools import system
 
-from processing_circuitscape.CircuitscapeAlgorithm import CircuitscapeAlgorithm
-from processing_circuitscape import CircuitscapeUtils
+from processing_circuitscape.circuitscapeAlgorithm import CircuitscapeAlgorithm
+from processing_circuitscape import circuitscapeUtils
 
 
 class Pairwise(CircuitscapeAlgorithm):
@@ -122,7 +122,7 @@ class Pairwise(CircuitscapeAlgorithm):
 
         commands = self.prepareInputs(parameters, context)
 
-        iniPath = CircuitscapeUtils.writeConfiguration()
+        iniPath = circuitscapeUtils.writeConfiguration()
         cfg = configparser.ConfigParser()
         cfg.read(iniPath)
 
@@ -164,7 +164,7 @@ class Pairwise(CircuitscapeAlgorithm):
             cfg.write(f)
 
         if system.isWindows():
-            csPath = CircuitscapeUtils.circuitscapeDirectory()
+            csPath = circuitscapeUtils.circuitscapeDirectory()
             if csPath == "":
                 csPath = "cs_run.exe"
             else:
@@ -174,5 +174,5 @@ class Pairwise(CircuitscapeAlgorithm):
         else:
             commands.append("csrun.py {}".format(iniPath))
 
-        CircuitscapeUtils.jobFileFromCommands(commands)
-        CircuitscapeUtils.execute(feedback)
+        circuitscapeUtils.jobFileFromCommands(commands)
+        circuitscapeUtils.execute(feedback)

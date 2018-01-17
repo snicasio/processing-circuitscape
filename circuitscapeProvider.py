@@ -35,10 +35,10 @@ from qgis.core import QgsProcessingProvider
 from processing.core.ProcessingConfig import ProcessingConfig, Setting
 from processing.tools.system import isWindows
 
-from processing_circuitscape.Pairwise import Pairwise
-from processing_circuitscape.OneToAll import OneToAll
-from processing_circuitscape.Advanced import Advanced
-from processing_circuitscape import CircuitscapeUtils
+from processing_circuitscape.pairwise import Pairwise
+from processing_circuitscape.oneToAll import OneToAll
+from processing_circuitscape.advanced import Advanced
+from processing_circuitscape import circuitscapeUtils
 
 pluginPath = os.path.dirname(__file__)
 
@@ -62,51 +62,51 @@ class CircuitscapeProvider(QgsProcessingProvider):
         ProcessingConfig.settingIcons[self.name()] = self.icon()
 
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.CIRCUITSCAPE_ACTIVE,
+                                            circuitscapeUtils.CIRCUITSCAPE_ACTIVE,
                                             self.tr("Activate"),
                                             False))
         if isWindows():
             ProcessingConfig.addSetting(Setting(self.name(),
-                                                CircuitscapeUtils.CIRCUITSCAPE_DIRECTORY,
+                                                circuitscapeUtils.CIRCUITSCAPE_DIRECTORY,
                                                 self.tr("Circuitscape directory"),
-                                                CircuitscapeUtils.circuitscapeDirectory(),
+                                                circuitscapeUtils.circuitscapeDirectory(),
                                                 valuetype=Setting.FOLDER))
 
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.CIRCUITSCAPE_VERBOSE,
+                                            circuitscapeUtils.CIRCUITSCAPE_VERBOSE,
                                             self.tr("Log commands output"),
                                             False))
 
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.FOUR_NEIGHBOURS,
+                                            circuitscapeUtils.FOUR_NEIGHBOURS,
                                             self.tr("Connect raster cells to 4 neighbors instead of 8"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.AVERAGE_CONDUCTANCE,
+                                            circuitscapeUtils.AVERAGE_CONDUCTANCE,
                                             self.tr("Use average conductance instead of resistance for connections between cells"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.PREEMPT_MEMORY,
+                                            circuitscapeUtils.PREEMPT_MEMORY,
                                             self.tr("Preemptively release memory when possible"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.MAX_CURRENT_MAPS,
+                                            circuitscapeUtils.MAX_CURRENT_MAPS,
                                             self.tr("Write maximum of current maps"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.CUM_MAX_MAPS,
+                                            circuitscapeUtils.CUM_MAX_MAPS,
                                             self.tr("Write cumulative & maximum current maps only"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.ZERO_FOCAL,
+                                            circuitscapeUtils.ZERO_FOCAL,
                                             self.tr("Set focal nodes currents to zero"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.LOG_TRANSFORM,
+                                            circuitscapeUtils.LOG_TRANSFORM,
                                             self.tr("Log-transform current maps"),
                                             False))
         ProcessingConfig.addSetting(Setting(self.name(),
-                                            CircuitscapeUtils.COMPRESS_OUTPUT,
+                                            circuitscapeUtils.COMPRESS_OUTPUT,
                                             self.tr("Compress output grids"),
                                             False))
 
@@ -115,25 +115,25 @@ class CircuitscapeProvider(QgsProcessingProvider):
         return True
 
     def unload(self):
-        ProcessingConfig.removeSetting(CircuitscapeUtils.CIRCUITSCAPE_ACTIVE)
+        ProcessingConfig.removeSetting(circuitscapeUtils.CIRCUITSCAPE_ACTIVE)
         if isWindows():
-            ProcessingConfig.removeSetting(CircuitscapeUtils.CIRCUITSCAPE_DIRECTORY)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.CIRCUITSCAPE_VERBOSE)
+            ProcessingConfig.removeSetting(circuitscapeUtils.CIRCUITSCAPE_DIRECTORY)
+        ProcessingConfig.removeSetting(circuitscapeUtils.CIRCUITSCAPE_VERBOSE)
 
-        ProcessingConfig.removeSetting(CircuitscapeUtils.FOUR_NEIGHBOURS)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.AVERAGE_CONDUCTANCE)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.PREEMPT_MEMORY)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.MAX_CURRENT_MAPS)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.CUM_MAX_MAPS)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.ZERO_FOCAL)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.LOG_TRANSFORM)
-        ProcessingConfig.removeSetting(CircuitscapeUtils.COMPRESS_OUTPUT)
+        ProcessingConfig.removeSetting(circuitscapeUtils.FOUR_NEIGHBOURS)
+        ProcessingConfig.removeSetting(circuitscapeUtils.AVERAGE_CONDUCTANCE)
+        ProcessingConfig.removeSetting(circuitscapeUtils.PREEMPT_MEMORY)
+        ProcessingConfig.removeSetting(circuitscapeUtils.MAX_CURRENT_MAPS)
+        ProcessingConfig.removeSetting(circuitscapeUtils.CUM_MAX_MAPS)
+        ProcessingConfig.removeSetting(circuitscapeUtils.ZERO_FOCAL)
+        ProcessingConfig.removeSetting(circuitscapeUtils.LOG_TRANSFORM)
+        ProcessingConfig.removeSetting(circuitscapeUtils.COMPRESS_OUTPUT)
 
     def isActive(self):
-        return ProcessingConfig.getSetting(CircuitscapeUtils.CIRCUITSCAPE_ACTIVE)
+        return ProcessingConfig.getSetting(circuitscapeUtils.CIRCUITSCAPE_ACTIVE)
 
     def setActive(self, active):
-        ProcessingConfig.setSettingValue(CircuitscapeUtils.CIRCUITSCAPE_ACTIVE, active)
+        ProcessingConfig.setSettingValue(circuitscapeUtils.CIRCUITSCAPE_ACTIVE, active)
 
     def supportsNonFileBasedOutput(self):
         return False

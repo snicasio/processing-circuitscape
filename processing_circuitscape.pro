@@ -1,10 +1,10 @@
 SOURCES = __init__.py \
-          CircuitscapeProviderPlugin.py \
-          CircuitscapeProvider.py \
-          CircuitscapeAlgorithm.py \
-          CircuitscapeUtils.py \
-          Pairwise.py \
-          OneToAll.py \
-          Advanced.py
+          circuitscapeProviderPlugin.py \
+          circuitscapeProvider.py \
+          circuitscapeAlgorithm.py \
+          circuitscapeUtils.py \
+          pairwise.py \
+          oneToAll.py \
+          advanced.py
 
 TRANSLATIONS = i18n/processing_circuitscape_uk.ts

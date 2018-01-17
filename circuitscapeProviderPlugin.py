@@ -27,7 +27,7 @@ __revision__ = '$Format:%H$'
 
 from qgis.core import QgsApplication
 
-from processing_circuitscape.CircuitscapeProvider import CircuitscapeProvider
+from processing_circuitscape.circuitscapeProvider import CircuitscapeProvider
 
 
 class CircuitscapeProviderPlugin:
