@@ -13,7 +13,6 @@ third party algorithms from QGIS, making your spatial analysis tasks more
 productive and easy to accomplish.
 
 This plugin implements Circuitscape provider for QGIS Processing framework.
-Requires QGIS >= 3.0
 
 Developed by Alexander Bruy for Faunalia (http://faunalia.eu) funded by Prof.
 António Mira (University of Évora, Portugal, Unidade de Biologia da Conservação)
