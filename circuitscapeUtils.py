@@ -27,14 +27,15 @@ __revision__ = '$Format:%H$'
 
 import os
 import stat
+import tempfile
 import subprocess
 import configparser
 
-from qgis.core import QgsMessageLog, QgsProcessingFeedback, QgsProcessingUtils
+from qgis.core import Qgis, QgsMessageLog, QgsProcessingFeedback, QgsProcessingUtils
 from processing.core.ProcessingLog import ProcessingLog
 from processing.core.ProcessingConfig import ProcessingConfig
 
-from processing.tools.system import isWindows, userFolder
+from processing.tools.system import isWindows
 
 CIRCUITSCAPE_ACTIVE = "CIRCUITSCAPE_ACTIVE"
 CIRCUITSCAPE_DIRECTORY = "CIRCUITSCAPE_DIRECTORY"
@@ -144,19 +145,17 @@ def writeConfiguration():
     return iniPath
 
 
-def batchJobFilename():
+def jobFile():
     if isWindows():
-        fileName = "circuitscape_batch_job.bat"
+        fileName = "circuitscape_job.bat"
     else:
-        fileName = "circuitscape_batch_job.sh"
+        fileName = "circuitscape_job.sh"
 
-    batchFile = userFolder() + os.sep + fileName
-
-    return batchFile
+    return os.path.join(tempfile.gettempdir(), fileName)
 
 
 def jobFileFromCommands(commands):
-    with open(batchJobFilename(), "w") as f:
+    with open(jobFile(), "w") as f:
         for command in commands:
             f.write("{}\n".format(command))
 
@@ -167,11 +166,11 @@ def execute(feedback):
     if isWindows():
         commands = ["cmd.exe", "/C", batchJobFilename()]
     else:
-        os.chmod(batchJobFilename(), stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
-        commands = [batchJobFilename()]
+        os.chmod(jobFile(), stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
+        commands = [jobFile()]
 
     fused_command = " ".join([str(c) for c in commands])
-    QgsMessageLog.logMessage(fused_command, "Processing", QgsMessageLog.INFO)
+    QgsMessageLog.logMessage(fused_command, "Processing", Qgis.Info)
     feedback.pushInfo("Circuitscape command:")
     feedback.pushCommandInfo(fused_command)
     feedback.pushInfo("Circuitscape command output:")
@@ -191,4 +190,4 @@ def execute(feedback):
             pass
 
     if ProcessingConfig.getSetting(CIRCUITSCAPE_VERBOSE):
-        QgsMessageLog.logMessage("\n".join(loglines), "Processing", QgsMessageLog.INFO)
+        QgsMessageLog.logMessage("\n".join(loglines), "Processing", Qgis.Info)
